@@ -73,6 +73,7 @@ function Consumer(options) {
   if (!Array.isArray(this.waitTimeSeconds)) {
     this.waitTimeSeconds = this.queueUrls.map(() => this.waitTimeSeconds);
   }
+  this.waitTimeSecondsOverrides = [];
 
   this.sticky = options.sticky || this.queueUrls.map(() => false);
 
@@ -138,12 +139,18 @@ Consumer.prototype._pollQueue = function(queueUrl, index) {
     return;
   }
 
+  var waitTime = this.waitTimeSeconds[index];
+  if (this.waitTimeSecondsOverrides.length > 0) {
+    waitTime = this.waitTimeSecondsOverrides[0];
+    this.waitTimeSecondsOverrides = this.waitTimeSecondsOverrides.slice(1);
+  }
+
   var receiveParams = {
     QueueUrl: queueUrl,
     AttributeNames: this.attributeNames,
     MessageAttributeNames: this.messageAttributeNames,
     MaxNumberOfMessages: this.maxNumberActive - this.numberActive,
-    WaitTimeSeconds: this.waitTimeSeconds[index],
+    WaitTimeSeconds: waitTime,
     VisibilityTimeout: this.initialVisibilityTimeout
   };
 
@@ -162,6 +169,7 @@ Consumer.prototype._pollQueue = function(queueUrl, index) {
       if (this.sticky[index]) {
         this.currentQueueIndex = index;
       }
+      this.waitTimeSecondsOverrides = this.queueUrls.map(() => 1);
 
       response.Messages.forEach(message => this._processMessage(message, queueUrl));
     } 

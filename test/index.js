@@ -424,7 +424,7 @@ describe('Consumer', function () {
       sqs.changeMessageVisibility.yields(sqsError);
 
       consumer.terminateVisibilityTimeout = true;
-      consumer.on('error', function (err) {
+      consumer.on('error', function () {
         setImmediate(function () {
           sinon.assert.calledWith(sqs.changeMessageVisibility, {
             QueueUrl: 'some-queue-url',
@@ -445,7 +445,7 @@ describe('Consumer', function () {
       consumer = new Consumer({
         queueUrl: 'some-queue-url',
         region: 'some-region',
-        handleMessage: function (message, done, queueUrl) {
+        handleMessage: function (message, done) {
           setTimeout(done, 4000);
         },
         sqs: sqs,
@@ -473,7 +473,7 @@ describe('Consumer', function () {
       consumer = new Consumer({
         queueUrl: 'some-queue-url',
         region: 'some-region',
-        handleMessage: function (message, done, queueUrl) {
+        handleMessage: function (message, done) {
           setTimeout(done, 4000);
         },
         sqs: sqs,

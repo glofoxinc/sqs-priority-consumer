@@ -1,13 +1,11 @@
-# sqs-consumer
-
-[![Build Status](https://travis-ci.org/bbc/sqs-consumer.svg)](https://travis-ci.org/bbc/sqs-consumer) [![Code Climate](https://codeclimate.com/github/BBC/sqs-consumer/badges/gpa.svg)](https://codeclimate.com/github/BBC/sqs-consumer) [![Test Coverage](https://codeclimate.com/github/BBC/sqs-consumer/badges/coverage.svg)](https://codeclimate.com/github/BBC/sqs-consumer)
+# sqs-priority-consumer
 
 Build SQS-based applications without the boilerplate. Just define a function that receives an SQS message and call a callback when the message has been processed.
 
 ## Installation
 
 ```bash
-npm install sqs-consumer --save
+npm install sqs-priority-consumer --save
 ```
 
 ## Usage
