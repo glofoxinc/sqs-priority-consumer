@@ -2,6 +2,8 @@
 
 Build SQS-based applications without the boilerplate. Just define a function that receives an SQS message and call a callback when the message has been processed.
 
+This is branched from `sqs-consumer`, but has a number of fixes to keep long-processing messages alive and to support switching between multiple queues in order to support a "priority" queue.
+
 ## Installation
 
 ```bash
@@ -14,7 +16,10 @@ npm install sqs-priority-consumer --save
 const Consumer = require('sqs-consumer');
 
 const app = Consumer.create({
-  queueUrl: 'https://sqs.eu-west-1.amazonaws.com/account-id/queue-name',
+  queueUrl: ['https://sqs.eu-west-1.amazonaws.com/account-id/priority-queue-name', 'https://sqs.eu-west-1.amazonaws.com/account-id/queue-name'],
+  waitTimeSeconds: [20, 5],
+  sticky: [1000000000, 20000],
+  
   handleMessage: (message, done) => {
     // do some work with `message`
     done();
@@ -79,7 +84,9 @@ Creates a new SQS consumer.
 
 #### Options
 
-* `queueUrl` - _String_ - The SQS queue URL.  If an array is provided, the URLs will be cycled
+* `queueUrl` - _Array_ - The SQS queue URL.  If an array is provided, the URLs will be cycled
+* `waitTimeSeconds` - _Array_ - The time to wait for each queue.  If just a number is provided, the same time will be used for all queues.
+* `sticky` - _Array_ - When a message is pulled from a queue, keep repolling this queue for `sticky` milliseconds.  This is good if queue #1 has 5000 messages in it, but queue #2 has 0 messages.  If you don't specify `sticky`, it will process a message from queue #1, then poll queue #2 with a waitTime of 1 second.  It will then move back to queue #1.  If you want a queue to be processed repeatedly without checking other queues, you can set this number to be big.
 * `region` - _String_ - The AWS region (default `eu-west-1`)
 * `handleMessage` - _Function_ - A function to be called whenever a message is received. Receives an SQS message object as its first argument and a function to call when the message has been handled as its second argument (i.e. `handleMessage(message, done)`).
 * `attributeNames` - _Array_ - List of queue attributes to retrieve (i.e. `['All', 'ApproximateFirstReceiveTimestamp', 'ApproximateReceiveCount']`).
