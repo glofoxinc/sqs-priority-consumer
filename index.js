@@ -74,7 +74,8 @@ function Consumer(options) {
     this.waitTimeSeconds = this.queueUrls.map(() => this.waitTimeSeconds);
   }
 
-  this.sticky = options.sticky || this.queueUrls.map(() => false);
+  this.sticky = options.sticky || this.queueUrls.map(() => 0);
+  this.lastReceiveTime = this.queueUrls.map(() => 0);
 
   this.authenticationErrorTimeout = options.authenticationErrorTimeout || 10000;
 
@@ -122,28 +123,43 @@ Consumer.prototype._poll = function () {
   if (this.numberActive < this.maxNumberActive) {
     clearTimeout(this._pollDebounce);
     this._pollDebounce = setTimeout(() => {
-      let index = this.currentQueueIndex++;
-      if (this.currentQueueIndex >= this.queueUrls.length) {
-        this.currentQueueIndex = 0;
+      let index = 0;
+
+      // if we get messages and the queue is "sticky",
+      // make sure we process that queue again next
+      let stickyValue = this.sticky[this.currentQueueIndex];
+      let lastReceiveTime = this.lastReceiveTime[this.currentQueueIndex];
+      if (stickyValue && (stickyValue === true || (new Date().getTime() - lastReceiveTime) < stickyValue)) {
+        index = this.currentQueueIndex;
+      }
+      else {
+        this.lastReceiveTime[this.currentQueueIndex] = 0;
+        this.currentQueueIndex++;
+        if (this.currentQueueIndex >= this.queueUrls.length) {
+          this.currentQueueIndex = 0;
+        }
+        index = this.currentQueueIndex;
       }
 
       let url = this.queueUrls[index];
-      this._pollQueue(url, index);
+      this._pollQueue(url, index, lastReceiveTime > 0 ? 1 : undefined);
     }, 0);
   }
 };
 
-Consumer.prototype._pollQueue = function(queueUrl, index) {
+Consumer.prototype._pollQueue = function(queueUrl, index, waitTimeOverride) {
   if (this.stopped) {
     return;
   }
 
+  var waitTime = this.waitTimeSeconds[index];
+  
   var receiveParams = {
     QueueUrl: queueUrl,
     AttributeNames: this.attributeNames,
     MessageAttributeNames: this.messageAttributeNames,
     MaxNumberOfMessages: this.maxNumberActive - this.numberActive,
-    WaitTimeSeconds: this.waitTimeSeconds[index],
+    WaitTimeSeconds: waitTimeOverride || waitTime,
     VisibilityTimeout: this.initialVisibilityTimeout
   };
 
@@ -157,25 +173,27 @@ Consumer.prototype._pollQueue = function(queueUrl, index) {
 
     if (response && response.Messages && response.Messages.length > 0) {
 
-      // if we get messages and the queue is "sticky",
-      // make sure we process that queue again next
-      if (this.sticky[index]) {
-        this.currentQueueIndex = index;
+      // mark the first time we receive a message in this cycle through the queues
+      if (this.lastReceiveTime[index] === 0) {
+        this.lastReceiveTime[index] = new Date().getTime();
       }
 
       response.Messages.forEach(message => this._processMessage(message, queueUrl));
     } 
     else if (response && !response.Messages) {
       this.emit('empty');
+      this.lastReceiveTime[index] = 0;
       this._poll();
     } 
     else if (err && isAuthenticationError(err)) {
       // there was an authentication error, so wait a bit before repolling
+      this.lastReceiveTime[index] = 0;
       debug('There was an authentication error. Pausing before retrying.');
       setTimeout(this._poll.bind(this), this.authenticationErrorTimeout);
     } 
     else {
       // there were no messages, so start polling again
+      this.lastReceiveTime[index] = 0;
       this._poll();
     }
   });
